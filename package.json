@@ -1,0 +1,23 @@
+{
+  "name": "ftpserver",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "setup-db": "node setup-db.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "FTP server for capturing Finale Inventory exports and storing in PostgreSQL",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ftp-srv": "^4.6.2",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
