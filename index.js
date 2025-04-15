@@ -90,55 +90,121 @@ const fileHandler = (ftpClient, fs) => {
   return {
     get: (filePath) => {
       try {
-        console.log(`GET command called for file: ${filePath}`);
+        console.log(`GET command called for path: ${filePath}`);
         const fullPath = path.join(uploadsDir, filePath);
 
-        // Special handling for directory listing - needed for proper FTP LIST command compatibility
-        const stats = fs.existsSync(fullPath) ? fs.statSync(fullPath) : null;
-        if (stats && stats.isDirectory()) {
-          console.log(
-            `GET received directory path: ${fullPath}, allowing for LIST compatibility`
-          );
-          // For directories, return a stream with directory listing info
-          const listing = fs
-            .readdirSync(fullPath)
-            .map((file) => {
-              try {
-                const fileStats = fs.statSync(path.join(fullPath, file));
-                return `${
-                  fileStats.isDirectory() ? "d" : "-"
-                }rw-r--r-- 1 owner group ${
-                  fileStats.size
-                } ${fileStats.mtime.toDateString()} ${file}\n`;
-              } catch (e) {
-                return null;
-              }
-            })
-            .filter(Boolean)
-            .join("");
+        // Make sure path exists, create directories as needed
+        if (!fs.existsSync(fullPath)) {
+          // If it's likely a directory (ends with / or is empty)
+          if (
+            filePath === "" ||
+            filePath === "." ||
+            filePath === "/" ||
+            filePath.endsWith("/")
+          ) {
+            console.log(`Creating directory: ${fullPath}`);
+            fs.mkdirSync(fullPath, { recursive: true });
+          } else {
+            console.error(`File not found: ${fullPath}`);
+            throw new Error(`File not found: ${filePath}`);
+          }
+        }
 
+        // Get stats safely
+        let stats;
+        try {
+          stats = fs.statSync(fullPath);
+        } catch (statError) {
+          console.error(`Error getting stats for ${fullPath}:`, statError);
+
+          // If stats fail but path exists, try to create a placeholder directory
+          if (fs.existsSync(fullPath)) {
+            console.log(
+              `Path exists but stats failed, trying to handle as directory`
+            );
+            return createDirectoryListingStream(fullPath);
+          }
+
+          throw new Error(`Cannot access ${filePath}: ${statError.message}`);
+        }
+
+        // Handle directory
+        if (stats && stats.isDirectory && stats.isDirectory()) {
+          console.log(
+            `GET received directory path: ${fullPath}, handling as directory listing`
+          );
+          return createDirectoryListingStream(fullPath);
+        }
+
+        // Handle regular file
+        if (stats && stats.isFile && stats.isFile()) {
+          console.log(`Serving file: ${fullPath}`);
+          return fs.createReadStream(fullPath);
+        }
+
+        // Fallback for any other type
+        console.log(
+          `Path is neither file nor directory, handling as empty stream: ${fullPath}`
+        );
+        const emptyStream = new (require("stream").Readable)();
+        emptyStream.push(null);
+        return emptyStream;
+      } catch (error) {
+        console.error(`Error in get handler for ${filePath}:`, error);
+        throw error;
+      }
+
+      // Helper function to create directory listing stream
+      function createDirectoryListingStream(dirPath) {
+        try {
+          console.log(`Creating directory listing for: ${dirPath}`);
+          let listing = "";
+
+          // Add directory entries
+          try {
+            if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+              const files = fs.readdirSync(dirPath);
+              console.log(`Found ${files.length} items in directory`);
+
+              // Add standard directory entries
+              listing += "-rw-r--r-- 1 owner group 0 Apr 1 2025 .\n";
+              listing += "-rw-r--r-- 1 owner group 0 Apr 1 2025 ..\n";
+
+              // Add all files
+              for (const file of files) {
+                try {
+                  const fullPath = path.join(dirPath, file);
+                  const fileStats = fs.statSync(fullPath);
+                  const isDir = fileStats.isDirectory();
+
+                  listing += `${isDir ? "d" : "-"}rw-r--r-- 1 owner group ${
+                    fileStats.size
+                  } Apr 1 2025 ${file}\n`;
+                } catch (fileErr) {
+                  console.log(`Error processing file ${file}:`, fileErr);
+                }
+              }
+            }
+          } catch (listErr) {
+            console.error(`Error listing directory ${dirPath}:`, listErr);
+            // Continue with empty listing
+          }
+
+          // Create stream
           const stream = require("stream");
           const readable = new stream.Readable();
+          readable._read = () => {}; // Required but noop
           readable.push(listing);
-          readable.push(null); // Indicates end of the stream
+          readable.push(null); // End of stream
+
           return readable;
+        } catch (streamErr) {
+          console.error(`Error creating directory listing stream:`, streamErr);
+          // Return empty stream as fallback
+          const emptyStream = new (require("stream").Readable)();
+          emptyStream.push(null);
+          return emptyStream;
         }
-
-        // Normal file handling
-        if (!fs.existsSync(fullPath)) {
-          console.error(`File not found: ${fullPath}`);
-          throw new Error(`File not found: ${filePath}`);
-        }
-
-        if (stats && !stats.isFile()) {
-          console.error(`Not a file: ${fullPath}`);
-          throw new Error(`Not a file: ${filePath}`);
-        }
-
-        return fs.createReadStream(fullPath);
-      } catch (error) {
-        console.error(`Error accessing file ${filePath}:`, error);
-        throw error;
       }
     },
     put: async (dataStream, filePath) => {
