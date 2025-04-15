@@ -10,7 +10,7 @@ services:
       - ./uploads:/app/uploads
     environment:
       - FTP_PORT=21
-      - PASV_URL=host.docker.internal  # This will resolve to your host machine IP
+      - PASV_URL=${PUBLIC_IP}  # Set this to your VPS's public IP
       - PASV_MIN=1024
       - PASV_MAX=30000
       - DB_USER=${DB_USER:-finale}
