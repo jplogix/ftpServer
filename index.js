@@ -30,12 +30,37 @@ const customLogger = {
   child: () => customLogger,
 };
 
+// Get a proper IP address for passive mode
+let pasvIP = process.env.PUBLIC_IP;
+if (!pasvIP) {
+  // If PUBLIC_IP isn't set, try to use PASV_URL but validate it first
+  const pasvUrl = process.env.PASV_URL || "127.0.0.1";
+
+  // Check if it's a domain name or IP
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(pasvUrl)) {
+    // It's already an IP address
+    pasvIP = pasvUrl;
+  } else {
+    // It's a domain, we should use the PUBLIC_IP instead if available
+    // For safety, default to a local IP
+    console.warn(
+      `PASV_URL is a domain (${pasvUrl}), using fallback IP 127.0.0.1`
+    );
+    console.warn(
+      "Please set PUBLIC_IP in your .env file for proper passive mode"
+    );
+    pasvIP = "127.0.0.1";
+  }
+}
+
+console.log(`Using passive mode IP: ${pasvIP}`);
+
 // Initialize FTP server
 const ftpServer = new FtpSrv({
   url: `ftp://0.0.0.0:${process.env.FTP_PORT || 21}`,
-  pasv_url: process.env.PASV_URL || "127.0.0.1",
+  pasv_url: pasvIP, // Use IP address, not domain name
   pasv_min: process.env.PASV_MIN || 1024,
-  pasv_max: process.env.PASV_MAX || 30000,
+  pasv_max: process.env.PASV_MAX || 1200, // Match the reduced range in docker-compose
   anonymous: false, // Require authentication
   greeting: "Welcome to Unify Finale Inventory FTP Server",
   blacklist: [], // Don't blacklist any commands
