@@ -152,45 +152,75 @@ const fileHandler = (ftpClient, fs) => {
     list: (filePath = ".") => {
       try {
         console.log(`LIST command called for path: ${filePath}`);
-        const dirPath = path.join(uploadsDir, filePath);
+        // Normalize the path - empty path, ".", and "/" should all list the root directory
+        const normalizedPath =
+          filePath === "/" || filePath === "" ? "." : filePath;
+        const dirPath = path.join(uploadsDir, normalizedPath);
 
         console.log(`Checking if path exists: ${dirPath}`);
         if (!fs.existsSync(dirPath)) {
-          console.log(`Path does not exist, returning empty array`);
-          return [];
+          console.log(`Path does not exist, creating directory: ${dirPath}`);
+          fs.mkdirSync(dirPath, { recursive: true });
+          return []; // Return empty array for the newly created directory
         }
 
-        // Explicitly check if this is a directory
+        // Handle path whether it's a file or directory
         const pathStats = fs.statSync(dirPath);
-        if (!pathStats.isDirectory()) {
-          console.error(`Path is not a directory: ${dirPath}`);
-          return [];
-        }
 
-        console.log(`Reading directory: ${dirPath}`);
-        const files = fs.readdirSync(dirPath);
+        if (pathStats.isDirectory()) {
+          // It's a directory, list its contents
+          console.log(`Reading directory: ${dirPath}`);
+          const files = fs.readdirSync(dirPath);
+          console.log(`Found ${files.length} files/directories`);
 
-        console.log(`Found ${files.length} files/directories`);
-        const results = [];
+          // Always include "." and ".." entries in directory listings
+          const results = [
+            {
+              name: ".",
+              type: "d",
+              size: pathStats.size,
+              mtime: pathStats.mtime,
+            },
+            {
+              name: "..",
+              type: "d",
+              size: pathStats.size,
+              mtime: pathStats.mtime,
+            },
+          ];
 
-        for (const file of files) {
-          try {
-            const fullPath = path.join(dirPath, file);
-            const stats = fs.statSync(fullPath);
+          // Add all files and directories
+          for (const file of files) {
+            try {
+              const fullPath = path.join(dirPath, file);
+              const stats = fs.statSync(fullPath);
 
-            results.push({
-              name: file,
-              type: stats.isDirectory() ? "d" : "-",
-              size: stats.size,
-              mtime: stats.mtime,
-            });
-          } catch (fileError) {
-            console.error(`Error processing file ${file}:`, fileError);
-            // Skip problem files but continue processing others
+              results.push({
+                name: file,
+                type: stats.isDirectory() ? "d" : "-",
+                size: stats.size,
+                mtime: stats.mtime,
+              });
+            } catch (fileError) {
+              console.error(`Error processing file ${file}:`, fileError);
+              // Skip problem files but continue processing others
+            }
           }
-        }
 
-        return results;
+          return results;
+        } else {
+          // It's a file, return just that file's info
+          console.log(`Path is a file, returning single file info: ${dirPath}`);
+          const fileName = path.basename(dirPath);
+          return [
+            {
+              name: fileName,
+              type: "-",
+              size: pathStats.size,
+              mtime: pathStats.mtime,
+            },
+          ];
+        }
       } catch (error) {
         console.error(`Error listing directory ${filePath}:`, error);
         return [];
