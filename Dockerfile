@@ -17,6 +17,14 @@ COPY . .
 # Create uploads directory if it doesn't exist
 RUN mkdir -p /app/uploads
 
+# Set default environment variables (can be overridden at runtime)
+ENV FTP_PORT=21 \
+    PASV_URL=ftp.unifywebservices.com \
+    PASV_MIN=1024 \
+    PASV_MAX=30000 \
+    FTP_USER=finale \
+    FTP_PASS=Inventory2025
+
 # Expose FTP ports (command and passive)
 EXPOSE 21 1024-30000
 
