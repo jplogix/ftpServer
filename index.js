@@ -75,6 +75,17 @@ const fileHandler = (ftpClient, fs) => {
   let currentDirectory = "/";
   console.log("Creating file handler for new connection");
 
+  // Check if uploads directory exists and is accessible
+  try {
+    console.log(`Checking uploads directory: ${uploadsDir}`);
+    const stats = fs.statSync(uploadsDir);
+    console.log(`Uploads directory exists: ${stats.isDirectory()}`);
+    console.log(`Directory permissions: ${stats.mode}`);
+    console.log(`Directory contents: ${fs.readdirSync(uploadsDir)}`);
+  } catch (error) {
+    console.error(`Error accessing uploads directory: ${error}`);
+  }
+
   // Create a custom file system handler with better compatibility
   return {
     get: (filePath) => {
@@ -120,22 +131,46 @@ const fileHandler = (ftpClient, fs) => {
     },
     list: (filePath = ".") => {
       try {
+        console.log(`LIST command called for path: ${filePath}`);
         const dirPath = path.join(uploadsDir, filePath);
+
+        console.log(`Checking if path exists: ${dirPath}`);
         if (!fs.existsSync(dirPath)) {
+          console.log(`Path does not exist, returning empty array`);
           return [];
         }
 
+        // Explicitly check if this is a directory
+        const pathStats = fs.statSync(dirPath);
+        if (!pathStats.isDirectory()) {
+          console.error(`Path is not a directory: ${dirPath}`);
+          return [];
+        }
+
+        console.log(`Reading directory: ${dirPath}`);
         const files = fs.readdirSync(dirPath);
-        return files.map((file) => {
-          const fullPath = path.join(dirPath, file);
-          const stats = fs.statSync(fullPath);
-          return {
-            name: file,
-            type: stats.isDirectory() ? "d" : "-",
-            size: stats.size,
-            mtime: stats.mtime,
-          };
-        });
+
+        console.log(`Found ${files.length} files/directories`);
+        const results = [];
+
+        for (const file of files) {
+          try {
+            const fullPath = path.join(dirPath, file);
+            const stats = fs.statSync(fullPath);
+
+            results.push({
+              name: file,
+              type: stats.isDirectory() ? "d" : "-",
+              size: stats.size,
+              mtime: stats.mtime,
+            });
+          } catch (fileError) {
+            console.error(`Error processing file ${file}:`, fileError);
+            // Skip problem files but continue processing others
+          }
+        }
+
+        return results;
       } catch (error) {
         console.error(`Error listing directory ${filePath}:`, error);
         return [];

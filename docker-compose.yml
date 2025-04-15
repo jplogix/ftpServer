@@ -5,7 +5,7 @@ services:
       - "21:21"
       - "1024-1200:1024-1200"  # Reduced passive port range to avoid conflicts
     volumes:
-      - "../files/ftp-uploads:/app/uploads"
+      - "./files/ftp-uploads:/app/uploads"
     environment:
       - FTP_PORT=21
       - PASV_URL=${PASV_URL}  # Using domain from .env file
