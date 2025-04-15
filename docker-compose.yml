@@ -3,14 +3,14 @@ services:
     build: .
     ports:
       - "21:21"
-      - "1024-30000:1024-30000"
+      - "1024-1200:1024-1200"  # Reduced passive port range to avoid conflicts
     volumes:
       - "../files/ftp-uploads:/app/uploads"
     environment:
       - FTP_PORT=21
       - PASV_URL=${PASV_URL}  # Using domain from .env file
       - PASV_MIN=1024
-      - PASV_MAX=30000
+      - PASV_MAX=1200  # Reduced to match exposed port range
       - DB_USER=${DB_USER:-finale}
       - DB_HOST=${DB_HOST:-192.3.166.251}
       - DB_NAME=${DB_NAME:-finaledb}
