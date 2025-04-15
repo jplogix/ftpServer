@@ -93,15 +93,44 @@ const fileHandler = (ftpClient, fs) => {
         console.log(`GET command called for file: ${filePath}`);
         const fullPath = path.join(uploadsDir, filePath);
 
-        // Check if file exists before creating read stream
+        // Special handling for directory listing - needed for proper FTP LIST command compatibility
+        const stats = fs.existsSync(fullPath) ? fs.statSync(fullPath) : null;
+        if (stats && stats.isDirectory()) {
+          console.log(
+            `GET received directory path: ${fullPath}, allowing for LIST compatibility`
+          );
+          // For directories, return a stream with directory listing info
+          const listing = fs
+            .readdirSync(fullPath)
+            .map((file) => {
+              try {
+                const fileStats = fs.statSync(path.join(fullPath, file));
+                return `${
+                  fileStats.isDirectory() ? "d" : "-"
+                }rw-r--r-- 1 owner group ${
+                  fileStats.size
+                } ${fileStats.mtime.toDateString()} ${file}\n`;
+              } catch (e) {
+                return null;
+              }
+            })
+            .filter(Boolean)
+            .join("");
+
+          const stream = require("stream");
+          const readable = new stream.Readable();
+          readable.push(listing);
+          readable.push(null); // Indicates end of the stream
+          return readable;
+        }
+
+        // Normal file handling
         if (!fs.existsSync(fullPath)) {
           console.error(`File not found: ${fullPath}`);
           throw new Error(`File not found: ${filePath}`);
         }
 
-        // Check if it's a file, not a directory
-        const stats = fs.statSync(fullPath);
-        if (!stats.isFile()) {
+        if (stats && !stats.isFile()) {
           console.error(`Not a file: ${fullPath}`);
           throw new Error(`Not a file: ${filePath}`);
         }
