@@ -7,7 +7,7 @@ services:
       - "21:21"
       - "1024-30000:1024-30000"
     volumes:
-      - ./uploads:/app/uploads
+      - "../files/ftp-uploads:/app/uploads"
     environment:
       - FTP_PORT=21
       - PASV_URL=${PASV_URL}  # Using domain from .env file
