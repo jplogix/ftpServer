@@ -19,6 +19,17 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
+// Create a custom logger compatible with ftp-srv requirements
+const customLogger = {
+  info: (...args) => console.log(...args),
+  error: (...args) => console.error(...args),
+  debug: (...args) => console.debug(...args),
+  trace: (...args) => console.trace(...args),
+  warn: (...args) => console.warn(...args),
+  // Add the child method that returns the same logger
+  child: () => customLogger,
+};
+
 // Initialize FTP server
 const ftpServer = new FtpSrv({
   url: `ftp://0.0.0.0:${process.env.FTP_PORT || 21}`,
@@ -30,7 +41,7 @@ const ftpServer = new FtpSrv({
   blacklist: [], // Don't blacklist any commands
   whitelist: [], // Allow all commands
   file_format: "ls", // Standard format for directory listings
-  log: console, // Log all events to console
+  log: customLogger, // Use our custom logger
 });
 
 // File system operations handler
