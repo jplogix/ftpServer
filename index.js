@@ -31,6 +31,9 @@ const ftpServer = new FtpSrv({
 
 // File system operations handler
 const fileHandler = (ftpClient, fs) => {
+  // Track current working directory
+  let currentDirectory = "/";
+
   return {
     get: (filePath) => {
       const fullPath = path.join(uploadsDir, filePath);
@@ -74,29 +77,94 @@ const fileHandler = (ftpClient, fs) => {
       }
     },
     list: (filePath = ".") => {
-      const dirPath = path.join(uploadsDir, filePath);
-      if (!fs.existsSync(dirPath)) {
+      try {
+        const dirPath = path.join(uploadsDir, filePath);
+        if (!fs.existsSync(dirPath)) {
+          return [];
+        }
+
+        const files = fs.readdirSync(dirPath);
+        return files.map((file) => {
+          const fullPath = path.join(dirPath, file);
+          const stats = fs.statSync(fullPath);
+          return {
+            name: file,
+            type: stats.isDirectory() ? "d" : "-",
+            size: stats.size,
+            mtime: stats.mtime,
+          };
+        });
+      } catch (error) {
+        console.error(`Error listing directory ${filePath}:`, error);
         return [];
       }
-
-      const files = fs.readdirSync(dirPath);
-      return files.map((file) => {
-        const fullPath = path.join(dirPath, file);
-        const stats = fs.statSync(fullPath);
-        return {
-          name: file,
-          type: stats.isDirectory() ? "d" : "-",
-          size: stats.size,
-          mtime: stats.mtime,
-        };
-      });
     },
     chdir: (filePath = ".") => {
-      const dirPath = path.join(uploadsDir, filePath);
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
+      try {
+        console.log(`Changing directory to: ${filePath}`);
+        const dirPath = path.join(uploadsDir, filePath);
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        currentDirectory = filePath;
+        return filePath;
+      } catch (error) {
+        console.error(`Error changing directory to ${filePath}:`, error);
+        return currentDirectory;
       }
-      return dirPath;
+    },
+    // Add PWD support
+    currentDirectory: () => {
+      return currentDirectory || "/";
+    },
+    // Make sure mkdir is supported
+    mkdir: (filePath) => {
+      try {
+        const dirPath = path.join(uploadsDir, filePath);
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        return filePath;
+      } catch (error) {
+        console.error(`Error creating directory ${filePath}:`, error);
+        throw error;
+      }
+    },
+    // Add support for renaming/moving files
+    rename: (from, to) => {
+      try {
+        const fromPath = path.join(uploadsDir, from);
+        const toPath = path.join(uploadsDir, to);
+        fs.renameSync(fromPath, toPath);
+        return toPath;
+      } catch (error) {
+        console.error(`Error renaming file from ${from} to ${to}:`, error);
+        throw error;
+      }
+    },
+    // Add support for removing files
+    unlink: (filePath) => {
+      try {
+        const fullPath = path.join(uploadsDir, filePath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch (error) {
+        console.error(`Error removing file ${filePath}:`, error);
+        throw error;
+      }
+    },
+    // Add support for removing directories
+    rmdir: (filePath) => {
+      try {
+        const dirPath = path.join(uploadsDir, filePath);
+        if (fs.existsSync(dirPath)) {
+          fs.rmdirSync(dirPath);
+        }
+      } catch (error) {
+        console.error(`Error removing directory ${filePath}:`, error);
+        throw error;
+      }
     },
   };
 };
