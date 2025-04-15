@@ -25,15 +25,21 @@ const ftpServer = new FtpSrv({
   pasv_url: process.env.PASV_URL || "127.0.0.1",
   pasv_min: process.env.PASV_MIN || 1024,
   pasv_max: process.env.PASV_MAX || 30000,
-  anonymous: false, // Allow anonymous login (can be changed to false for authentication)
+  anonymous: false, // Require authentication
   greeting: "Welcome to Unify Finale Inventory FTP Server",
+  blacklist: [], // Don't blacklist any commands
+  whitelist: [], // Allow all commands
+  file_format: "ls", // Standard format for directory listings
+  log: console, // Log all events to console
 });
 
 // File system operations handler
 const fileHandler = (ftpClient, fs) => {
   // Track current working directory
   let currentDirectory = "/";
+  console.log("Creating file handler for new connection");
 
+  // Create a custom file system handler with better compatibility
   return {
     get: (filePath) => {
       const fullPath = path.join(uploadsDir, filePath);
@@ -115,7 +121,17 @@ const fileHandler = (ftpClient, fs) => {
     },
     // Add PWD support
     currentDirectory: () => {
+      console.log(
+        `PWD command called, returning current directory: ${currentDirectory}`
+      );
       return currentDirectory || "/";
+    },
+    // Add this to explicitly handle the PWD command
+    pwd: () => {
+      console.log(
+        `Explicit PWD handler called, returning: ${currentDirectory}`
+      );
+      return { path: currentDirectory };
     },
     // Make sure mkdir is supported
     mkdir: (filePath) => {
