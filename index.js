@@ -89,8 +89,28 @@ const fileHandler = (ftpClient, fs) => {
   // Create a custom file system handler with better compatibility
   return {
     get: (filePath) => {
-      const fullPath = path.join(uploadsDir, filePath);
-      return fs.createReadStream(fullPath);
+      try {
+        console.log(`GET command called for file: ${filePath}`);
+        const fullPath = path.join(uploadsDir, filePath);
+
+        // Check if file exists before creating read stream
+        if (!fs.existsSync(fullPath)) {
+          console.error(`File not found: ${fullPath}`);
+          throw new Error(`File not found: ${filePath}`);
+        }
+
+        // Check if it's a file, not a directory
+        const stats = fs.statSync(fullPath);
+        if (!stats.isFile()) {
+          console.error(`Not a file: ${fullPath}`);
+          throw new Error(`Not a file: ${filePath}`);
+        }
+
+        return fs.createReadStream(fullPath);
+      } catch (error) {
+        console.error(`Error accessing file ${filePath}:`, error);
+        throw error;
+      }
     },
     put: async (dataStream, filePath) => {
       try {
