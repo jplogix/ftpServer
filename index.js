@@ -1,6 +1,6 @@
 const { FtpSrv } = require("ftp-srv");
-const fs = require("fs:node");
-const path = require("path:node");
+const fs = require("fs");
+const path = require("path");
 const { Pool } = require("pg");
 require("dotenv").config();
 
